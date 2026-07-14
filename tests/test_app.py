@@ -1,27 +1,31 @@
-import pytest
-from fastapi.testclient import TestClient
+import asyncio
+
+import httpx
 
 from src.app import app
 
 
-@pytest.fixture
-def client():
-    # Arrange
-    return TestClient(app)
+def _request(method: str, path: str, **kwargs):
+    async def _call() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            return await client.request(method, path, **kwargs)
+
+    return asyncio.run(_call())
 
 
-def test_root_redirects_to_static_index(client):
+def test_root_redirects_to_static_index():
     # Act
-    response = client.get("/", follow_redirects=False)
+    response = _request("GET", "/", follow_redirects=False)
 
     # Assert
     assert response.status_code == 307
     assert response.headers["location"] == "/static/index.html"
 
 
-def test_get_activities_returns_seed_data(client):
+def test_get_activities_returns_seed_data():
     # Act
-    response = client.get("/activities")
+    response = _request("GET", "/activities")
 
     # Assert
     assert response.status_code == 200
